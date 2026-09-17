@@ -16,6 +16,11 @@ semua model Eloquent aplikasi melalui tools MCP berikut:
 - `list_records` dan `get_record` untuk membaca data dengan filter exact-match dan pagination.
 - `create_record`, `update_record`, dan `delete_record` untuk CRUD.
 
+Client MCP standar memanggil operasi tersebut melalui `tools/call`. Untuk client
+yang mengirim nama operasi sebagai method JSON-RPC langsung, server juga menerima
+`list_models`, `describe_model`, `list_records`, `get_record`, `create_record`,
+`update_record`, dan `delete_record` dengan argumen di properti `params`.
+
 Endpoint dilindungi bearer token. Salin pengaturan berikut ke `.env`, gunakan token
 acak yang panjang, lalu bersihkan cache konfigurasi:
 

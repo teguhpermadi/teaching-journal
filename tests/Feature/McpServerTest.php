@@ -81,6 +81,84 @@ test('supports MCP initialization and tool discovery', function () {
         ->assertJsonFragment(['name' => 'create_record']);
 });
 
+test('supports CRUD tool names as direct JSON-RPC methods', function () {
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 20,
+        'method' => 'list_models',
+        'params' => [],
+    ])->assertOk()
+        ->assertJsonPath('result.structuredContent.models.0.name', 'academic_calendars');
+
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 21,
+        'method' => 'describe_model',
+        'params' => ['model' => 'academic_years'],
+    ])->assertOk()
+        ->assertJsonPath('result.structuredContent.name', 'academic_years');
+
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 22,
+        'method' => 'list_records',
+        'params' => ['model' => 'academic_years'],
+    ])->assertOk()
+        ->assertJsonStructure(['result' => ['structuredContent' => ['data', 'pagination']]]);
+
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 23,
+        'method' => 'get_record',
+        'params' => ['model' => 'academic_years', 'id' => '01missing'],
+    ])->assertOk()
+        ->assertJsonPath('error.code', -32602);
+});
+
+test('supports direct create update and delete methods', function () {
+    config(['mcp.allow_mutations' => true]);
+
+    $create = mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 24,
+        'method' => 'create_record',
+        'params' => [
+            'model' => 'academic_years',
+            'data' => [
+                'year' => '2026/2027',
+                'semester' => 'ganjil',
+                'headmaster_name' => 'Direct MCP Test',
+                'headmaster_nip' => '123456789',
+                'date_start' => '2026-07-01',
+                'date_end' => '2026-12-31',
+                'active' => false,
+            ],
+        ],
+    ])->assertOk();
+
+    $id = $create->json('result.structuredContent.id');
+
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 25,
+        'method' => 'update_record',
+        'params' => [
+            'model' => 'academic_years',
+            'id' => $id,
+            'data' => ['year' => '2026/2027 updated'],
+        ],
+    ])->assertOk()
+        ->assertJsonPath('result.structuredContent.year', '2026/2027 updated');
+
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 26,
+        'method' => 'delete_record',
+        'params' => ['model' => 'academic_years', 'id' => $id],
+    ])->assertOk()
+        ->assertJsonPath('result.structuredContent.deleted', true);
+});
+
 test('does not permit mutations unless explicitly enabled', function () {
     mcpRequest([
         'jsonrpc' => '2.0',

@@ -38,6 +38,13 @@ class McpServer
                 'ping' => $this->result($id, []),
                 'tools/list' => $this->result($id, ['tools' => $this->tools()]),
                 'tools/call' => $this->callTool($id, $request['params'] ?? []),
+                'list_models',
+                'describe_model',
+                'list_records',
+                'get_record',
+                'create_record',
+                'update_record',
+                'delete_record' => $this->callDirectTool($id, $method, $request['params'] ?? []),
                 default => $this->error($id, -32601, "Method not found: {$method}"),
             };
         } catch (InvalidArgumentException $exception) {
@@ -148,6 +155,28 @@ class McpServer
             'update_record' => $this->mutate(fn () => $this->updateRecord($arguments)),
             'delete_record' => $this->mutate(fn () => $this->deleteRecord($arguments)),
             default => throw new InvalidArgumentException("Unknown MCP tool: {$name}"),
+        };
+
+        return $this->result($id, [
+            'content' => [['type' => 'text', 'text' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]],
+            'structuredContent' => $data,
+        ]);
+    }
+
+    private function callDirectTool(mixed $id, string $name, mixed $arguments): array
+    {
+        if (! is_array($arguments)) {
+            return $this->error($id, -32602, 'Method params must be an object.');
+        }
+
+        $data = match ($name) {
+            'list_models' => $this->listModels(),
+            'describe_model' => $this->describeModel($arguments),
+            'list_records' => $this->listRecords($arguments),
+            'get_record' => $this->getRecord($arguments),
+            'create_record' => $this->mutate(fn () => $this->createRecord($arguments)),
+            'update_record' => $this->mutate(fn () => $this->updateRecord($arguments)),
+            'delete_record' => $this->mutate(fn () => $this->deleteRecord($arguments)),
         };
 
         return $this->result($id, [
