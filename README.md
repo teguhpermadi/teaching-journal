@@ -7,6 +7,57 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## MCP server
+
+Aplikasi ini menyediakan MCP server HTTP di `POST /mcp`. Server ini mengekspos
+semua model Eloquent aplikasi melalui tools MCP berikut:
+
+- `list_models` dan `describe_model` untuk menemukan model serta field yang tersedia.
+- `list_records` dan `get_record` untuk membaca data dengan filter exact-match dan pagination.
+- `create_record`, `update_record`, dan `delete_record` untuk CRUD.
+
+Endpoint dilindungi bearer token. Salin pengaturan berikut ke `.env`, gunakan token
+acak yang panjang, lalu bersihkan cache konfigurasi:
+
+```dotenv
+MCP_TOKEN=replace-with-a-long-random-secret
+MCP_TOKEN_TTL=1440
+MCP_ALLOW_MUTATIONS=true
+MCP_MAX_PAGE_SIZE=100
+```
+
+Untuk mendapatkan token database melalui login API:
+
+```http
+POST /api/mcp/login
+Content-Type: application/json
+
+{"email":"guru@example.com","password":"password"}
+```
+
+Gunakan nilai `access_token` dari respons sebagai `Authorization: Bearer <token>`
+untuk request ke `/mcp`. Token berlaku sesuai `MCP_TOKEN_TTL` (default 24 jam) dan
+disimpan sebagai hash. Token aktif dapat dicabut dengan `POST /api/mcp/logout`.
+
+Contoh konfigurasi client MCP berbasis HTTP:
+
+```json
+{
+  "mcpServers": {
+    "teaching-journal": {
+      "url": "http://localhost/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-a-long-random-secret"
+      }
+    }
+  }
+}
+```
+
+Mutasi dinonaktifkan secara default. Model dan field yang dapat diakses dibatasi
+oleh allowlist server dan `fillable` masing-masing model; query SQL atau class
+arbitrer tidak pernah diterima dari client.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

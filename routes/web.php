@@ -4,6 +4,12 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\JournalDownloadController;
 use App\Http\Controllers\AttendanceDownloadController;
 use App\Http\Controllers\RecapJournalController;
+use App\Http\Controllers\McpController;
+use App\Http\Middleware\AuthenticateMcp;
+
+Route::post('/mcp', McpController::class)
+    ->middleware(AuthenticateMcp::class)
+    ->name('mcp');
 
 Route::get('/', function () {
     return redirect()->route('filament.admin.pages.dashboard');
