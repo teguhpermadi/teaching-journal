@@ -1,14 +1,24 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\AcademicYear;
 use App\Models\Role;
 use App\Models\User;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Role::firstOrCreate([
+        'name' => 'teacher',
+        'guard_name' => 'web',
+    ]);
+
+    $mcpUser = User::factory()->create();
+    AcademicYear::factory()->create(['active' => true]);
+
     config([
         'mcp.token' => 'test-mcp-token',
+        'mcp.static_user_id' => $mcpUser->getKey(),
         'mcp.allow_mutations' => false,
     ]);
 });
@@ -28,11 +38,6 @@ test('rejects requests without the MCP token', function () {
 });
 
 test('can login through the API and use the issued bearer token', function () {
-    Role::create([
-        'name' => 'teacher',
-        'guard_name' => 'web',
-    ]);
-
     $user = User::factory()->create([
         'email' => 'mcp@example.com',
         'password' => 'secret-password',
@@ -79,6 +84,18 @@ test('supports MCP initialization and tool discovery', function () {
     ])->assertOk()
         ->assertJsonFragment(['name' => 'list_models'])
         ->assertJsonFragment(['name' => 'create_record']);
+});
+
+test('exposes enum metadata and active-user scope in model description', function () {
+    mcpRequest([
+        'jsonrpc' => '2.0',
+        'id' => 19,
+        'method' => 'describe_model',
+        'params' => ['model' => 'academic_years'],
+    ])->assertOk()
+        ->assertJsonPath('result.structuredContent.enums.semester.class', App\SemesterEnum::class)
+        ->assertJsonPath('result.structuredContent.scope.requires_authenticated_user', true)
+        ->assertJsonPath('result.structuredContent.scope.academic_year', 'active');
 });
 
 test('supports CRUD tool names as direct JSON-RPC methods', function () {

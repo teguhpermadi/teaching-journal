@@ -31,6 +31,13 @@ class AuthenticateMcp
             && $providedToken !== ''
             && hash_equals($configuredToken, $providedToken);
 
+        if ($validStaticToken && config('mcp.static_user_id')) {
+            $staticUser = \App\Models\User::query()->find(config('mcp.static_user_id'));
+            if ($staticUser) {
+                $request->setUserResolver(fn () => $staticUser);
+            }
+        }
+
         if (! $validDatabaseToken && ! $validStaticToken) {
             return response()->json([
                 'jsonrpc' => '2.0',

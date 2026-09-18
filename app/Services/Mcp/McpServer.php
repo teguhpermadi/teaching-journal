@@ -5,6 +5,22 @@ namespace App\Services\Mcp;
 use App\Models\Journal;
 use App\Models\MainTarget;
 use App\Models\Target;
+use App\Models\AcademicCalendar;
+use App\Models\AcademicYear;
+use App\Models\Attendance;
+use App\Models\Grade;
+use App\Models\LessonPlan;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Schedule;
+use App\Models\Signature;
+use App\Models\SocialiteUser;
+use App\Models\Student;
+use App\Models\Subject;
+use App\Models\Transcript;
+use App\Models\TranscriptStudent;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\QueryException;
@@ -196,6 +212,7 @@ class McpServer
     {
         $model = $this->registry->new($this->requiredString($arguments, 'model'));
         $columns = Schema::getColumnListing($model->getTable());
+        $casts = $model->getCasts();
 
         return [
             'name' => $arguments['model'],
@@ -204,6 +221,11 @@ class McpServer
             'primary_key' => $model->getKeyName(),
             'fillable' => $model->getFillable(),
             'columns' => $columns,
+            'enums' => $this->enumMetadata($casts),
+            'scope' => [
+                'requires_authenticated_user' => true,
+                'academic_year' => 'active',
+            ],
             'soft_deletes' => in_array(SoftDeletes::class, class_uses_recursive($model), true),
         ];
     }
@@ -211,7 +233,7 @@ class McpServer
     private function listRecords(array $arguments): array
     {
         $model = $this->registry->new($this->requiredString($arguments, 'model'));
-        $query = $model->newQuery();
+        $query = $this->scopedQuery($model);
         $columns = Schema::getColumnListing($model->getTable());
         $filters = $arguments['filters'] ?? [];
 
@@ -252,7 +274,7 @@ class McpServer
     private function getRecord(array $arguments): array
     {
         $model = $this->registry->new($this->requiredString($arguments, 'model'));
-        $query = $model->newQuery();
+        $query = $this->scopedQuery($model);
         $this->withTrashedIfRequested($model, $query, $arguments);
         $record = $query->find($arguments['id'] ?? null);
 
@@ -276,7 +298,7 @@ class McpServer
     private function updateRecord(array $arguments): array
     {
         $model = $this->registry->new($this->requiredString($arguments, 'model'));
-        $record = $model->newQuery()->find($arguments['id'] ?? null);
+        $record = $this->scopedQuery($model)->find($arguments['id'] ?? null);
 
         if (! $record) {
             throw new InvalidArgumentException('Record not found.');
@@ -292,7 +314,7 @@ class McpServer
     private function deleteRecord(array $arguments): array
     {
         $model = $this->registry->new($this->requiredString($arguments, 'model'));
-        $record = $model->newQuery()->find($arguments['id'] ?? null);
+        $record = $this->scopedQuery($model)->find($arguments['id'] ?? null);
 
         if (! $record) {
             throw new InvalidArgumentException('Record not found.');
@@ -308,6 +330,8 @@ class McpServer
         if (! (bool) config('mcp.allow_mutations', false)) {
             throw new InvalidArgumentException('MCP mutations are disabled. Set MCP_ALLOW_MUTATIONS=true to enable them.');
         }
+
+        $this->authenticatedUserId();
 
         return $callback();
     }
@@ -326,6 +350,122 @@ class McpServer
         }
 
         return $data;
+    }
+
+    private function enumMetadata(array $casts): array
+    {
+        $enums = [];
+
+        foreach ($casts as $field => $cast) {
+            if (! is_string($cast) || ! enum_exists($cast)) {
+                continue;
+            }
+
+            $reflection = new \ReflectionEnum($cast);
+            $cases = [];
+
+            foreach ($reflection->getCases() as $case) {
+                $value = $case instanceof \ReflectionEnumBackedCase
+                    ? $case->getBackingValue()
+                    : $case->getName();
+                $enum = $case->getValue();
+
+                $cases[] = [
+                    'name' => $case->getName(),
+                    'value' => $value,
+                    'label' => method_exists($enum, 'getLabel') ? $enum->getLabel() : $value,
+                    'color' => method_exists($enum, 'getColor') ? $enum->getColor() : null,
+                ];
+            }
+
+            $enums[$field] = [
+                'class' => $cast,
+                'cases' => $cases,
+            ];
+        }
+
+        return $enums;
+    }
+
+    private function scopedQuery(Model $model): Builder
+    {
+        $userId = $this->authenticatedUserId();
+        $query = $model->newQuery();
+        $activeYear = AcademicYear::query()->where('active', true)->first();
+
+        if (! $activeYear) {
+            throw new InvalidArgumentException('No active academic year is configured.');
+        }
+
+        $class = $model::class;
+
+        if ($class === AcademicYear::class) {
+            return $query->whereKey($activeYear->getKey());
+        }
+
+        if (in_array('user_id', Schema::getColumnListing($model->getTable()), true)) {
+            $query->where($model->qualifyColumn('user_id'), $userId);
+        }
+
+        if (in_array('academic_year_id', Schema::getColumnListing($model->getTable()), true)) {
+            $query->where($model->qualifyColumn('academic_year_id'), $activeYear->getKey());
+        }
+
+        if ($class === Attendance::class) {
+            $query->whereBetween($model->qualifyColumn('date'), [
+                $activeYear->date_start,
+                $activeYear->date_end,
+            ])->whereHas('student.grades.subjects', function (Builder $subjectQuery) use ($userId, $activeYear): void {
+                $subjectQuery->where('subjects.user_id', $userId)
+                    ->where('subjects.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === Student::class) {
+            $query->whereHas('grades.subjects', function (Builder $subjectQuery) use ($userId, $activeYear): void {
+                $subjectQuery->where('subjects.user_id', $userId)
+                    ->where('subjects.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === Grade::class) {
+            $query->whereHas('subjects', function (Builder $subjectQuery) use ($userId, $activeYear): void {
+                $subjectQuery->where('subjects.user_id', $userId)
+                    ->where('subjects.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === Schedule::class) {
+            $query->whereHas('subject', function (Builder $subjectQuery) use ($userId, $activeYear): void {
+                $subjectQuery->where('subjects.user_id', $userId)
+                    ->where('subjects.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === Signature::class) {
+            $query->whereHas('journal', function (Builder $journalQuery) use ($userId, $activeYear): void {
+                $journalQuery->where('journals.user_id', $userId)
+                    ->where('journals.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === TranscriptStudent::class) {
+            $query->whereHas('transcript', function (Builder $transcriptQuery) use ($userId, $activeYear): void {
+                $transcriptQuery->where('transcripts.user_id', $userId)
+                    ->where('transcripts.academic_year_id', $activeYear->getKey());
+            });
+        } elseif ($class === Permission::class) {
+            $query->whereIn($model->qualifyColumn('id'), User::findOrFail($userId)->getAllPermissions()->pluck('id'));
+        } elseif ($class === Role::class) {
+            $query->whereIn($model->qualifyColumn('id'), User::findOrFail($userId)->roles()->pluck('id'));
+        } elseif ($class === User::class) {
+            $query->whereKey($userId);
+        } elseif ($class === SocialiteUser::class) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query;
+    }
+
+    private function authenticatedUserId(): string
+    {
+        $user = request()->user();
+
+        if (! $user) {
+            throw new InvalidArgumentException('An authenticated MCP user is required for data access.');
+        }
+
+        return (string) $user->getAuthIdentifier();
     }
 
     private function validateModelRelations(Model $model, array $data): void
@@ -412,6 +552,13 @@ class McpServer
 
         // merge incoming data
         $effective = array_merge($effective, $data);
+        $authenticatedUserId = $this->authenticatedUserId();
+
+        if (array_key_exists('user_id', $effective)
+            && $effective['user_id'] !== null
+            && (string) $effective['user_id'] !== $authenticatedUserId) {
+            throw new InvalidArgumentException('user_id must match the authenticated MCP user.');
+        }
 
         $contextFields = ['academic_year_id', 'subject_id', 'grade_id', 'user_id'];
 
@@ -435,7 +582,7 @@ class McpServer
                     }
                 }
 
-                $found = $targetClass::query()->whereIn('id', $ids)->get();
+                $found = $this->scopedQuery(new $targetClass())->whereIn('id', $ids)->get();
                 if ($found->count() !== count($ids)) {
                     throw new InvalidArgumentException("One or more {$field} values do not exist.");
                 }
@@ -447,7 +594,7 @@ class McpServer
                     throw new InvalidArgumentException("{$field} must be a string or integer ID.");
                 }
 
-                $related = $targetClass::query()->find($id);
+                $related = $this->scopedQuery(new $targetClass())->find($id);
                 if (! $related) {
                     throw new InvalidArgumentException("{$field} value does not exist.");
                 }
