@@ -63,6 +63,18 @@ Mutasi dinonaktifkan secara default. Model dan field yang dapat diakses dibatasi
 oleh allowlist server dan `fillable` masing-masing model; query SQL atau class
 arbitrer tidak pernah diterima dari client.
 
+Semua operasi data MCP memerlukan user yang terautentikasi melalui token login
+API. Query dibatasi ke user tersebut dan academic year yang berstatus aktif.
+Relasi tidak langsung juga dibatasi, misalnya Student melalui Subject milik user,
+Signature melalui Journal milik user, dan Schedule melalui Subject milik user.
+Jika memakai `MCP_TOKEN` statis, isi `MCP_STATIC_USER_ID` agar token tersebut tetap
+memiliki konteks user; tanpa nilai itu token statis hanya dapat dipakai untuk
+operasi handshake/discovery, bukan membaca atau mengubah data.
+
+`describe_model` mengembalikan metadata enum dari setiap model, termasuk class,
+nama case, value, label, dan color jika tersedia. Gunakan metadata tersebut untuk
+mengirim value enum yang valid saat membuat atau memperbarui record.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

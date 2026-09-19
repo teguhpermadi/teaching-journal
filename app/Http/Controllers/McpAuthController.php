@@ -28,7 +28,7 @@ class McpAuthController extends Controller
         }
 
         $plainToken = Str::random(80);
-        $expiresAt = now()->addMinutes(max((int) config('mcp.token_ttl', 1440), 1));
+        $expiresAt = now()->addMinutes(max((int) config('mcp.token_ttl', 43200), 1));
 
         McpToken::create([
             'user_id' => $user->getKey(),
