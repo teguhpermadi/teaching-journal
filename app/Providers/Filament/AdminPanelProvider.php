@@ -26,12 +26,16 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Jeffgreco13\FilamentBreezy\BreezyCore;
+use JeffGreco13\Breezy\Livewire\SanctumTokens;
 use DutchCodingCompany\FilamentSocialite\Provider;
+use Livewire\Livewire;
 
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
+        Livewire::component('mcp_tokens', \App\Filament\Resources\Users\Pages\McpTokenManager::class);
+
         return $panel
             ->default()
             ->id('admin')
@@ -70,6 +74,8 @@ class AdminPanelProvider extends PanelProvider
                 BreezyCore::make()
                     ->myProfileComponents([
                         'personal_info' => MyPersonalInfo::class,
+                        'sanctum_tokens' => \JeffGreco13\Breezy\Livewire\SanctumTokens::class,
+                        'mcp_tokens' => \App\Filament\Resources\Users\Pages\McpTokenManager::class,
                     ])
                     ->myProfile(
                         shouldRegisterUserMenu: true, // Sets the 'account' link in the panel User Menu (default = true)

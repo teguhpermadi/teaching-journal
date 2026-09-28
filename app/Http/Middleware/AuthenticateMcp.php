@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\McpToken;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateMcp
@@ -18,15 +18,23 @@ class AuthenticateMcp
             : (string) $request->header('X-MCP-Token');
 
         $token = null;
+        $validDatabaseToken = false;
+
         if ($providedToken !== '') {
-            $token = McpToken::query()
-                ->with('user')
-                ->where('token_hash', hash('sha256', $providedToken))
-                ->first();
+            // Cek Sanctum token dengan type 'mcp'
+            $token = \Laravel\Sanctum\PersonalAccessToken::findToken($providedToken);
+
+            if ($token
+                && $token->type === 'mcp'
+                && $token->tokenable_type === \App\Models\User::class
+                && ($token->expires_at === null || $token->expires_at->isFuture())
+            ) {
+                $validDatabaseToken = true;
+                $token->forceFill(['last_used_at' => now()])->save();
+                $request->setUserResolver(fn () => $token->tokenable);
+            }
         }
 
-        $validDatabaseToken = $token
-            && ($token->expires_at === null || $token->expires_at->isFuture());
         $validStaticToken = $configuredToken !== ''
             && $providedToken !== ''
             && hash_equals($configuredToken, $providedToken);
@@ -48,11 +56,7 @@ class AuthenticateMcp
             ], 401);
         }
 
-        if ($validDatabaseToken) {
-            $token->forceFill(['last_used_at' => now()])->save();
-            $request->attributes->set('mcp_token', $token);
-            $request->setUserResolver(fn () => $token->user);
-        }
+        $request->attributes->set('mcp_token', $token);
 
         return $next($request);
     }

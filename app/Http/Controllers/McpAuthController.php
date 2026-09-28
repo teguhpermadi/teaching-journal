@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\McpToken;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,7 +17,7 @@ class McpAuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = \App\Models\User::query()
+        $user = User::query()
             ->where('email', $credentials['email'])
             ->first();
 
@@ -27,14 +27,17 @@ class McpAuthController extends Controller
             ], 401);
         }
 
-        $plainToken = Str::random(80);
         $expiresAt = now()->addMinutes(max((int) config('mcp.token_ttl', 43200), 1));
 
-        McpToken::create([
-            'user_id' => $user->getKey(),
-            'token_hash' => hash('sha256', $plainToken),
-            'expires_at' => $expiresAt,
-        ]);
+        $newToken = $user->createToken(
+            'mcp-' . Str::random(12),
+            ['mcp'],
+            $expiresAt,
+        );
+
+        // Set type 'mcp' pada token Sanctum
+        $newToken->accessToken->forceFill(['type' => 'mcp'])->save();
+        $plainToken = $newToken->plainTextToken;
 
         return response()->json([
             'token_type' => 'Bearer',
@@ -52,7 +55,7 @@ class McpAuthController extends Controller
     {
         $token = $request->attributes->get('mcp_token');
 
-        if ($token instanceof McpToken) {
+        if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
             $token->delete();
         }
 

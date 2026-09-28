@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\EnumInfoController;
 use App\Http\Controllers\Api\GradeController;
 use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\MainTargetController;
-use App\Http\Controllers\Api\McpTokenController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SignatureController;
@@ -142,8 +141,6 @@ Route::middleware(AuthenticateMcp::class)->group(function () {
     Route::get('/users/me', [UserController::class, 'me']);
 
     /* ── MCP Tokens ──────────────────────────── */
-    Route::get('/mcp-tokens', [McpTokenController::class, 'index']);
-    Route::delete('/mcp-tokens/{id}', [McpTokenController::class, 'revoke']);
 
     /* ── Permissions (read-only) ─────────────── */
     Route::get('/permissions', [PermissionController::class, 'index']);
