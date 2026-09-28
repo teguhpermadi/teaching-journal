@@ -2,7 +2,6 @@
 
 namespace App\Services\Mcp;
 
-use App\Models\AcademicCalendar;
 use App\Models\AcademicYear;
 use App\Models\Attendance;
 use App\Models\Grade;
@@ -31,7 +30,6 @@ class McpModelRegistry
     public function models(): array
     {
         return [
-            'academic_calendars' => AcademicCalendar::class,
             'academic_years' => AcademicYear::class,
             'attendances' => Attendance::class,
             'grades' => Grade::class,

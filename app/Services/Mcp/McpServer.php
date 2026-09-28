@@ -5,7 +5,6 @@ namespace App\Services\Mcp;
 use App\Models\Journal;
 use App\Models\MainTarget;
 use App\Models\Target;
-use App\Models\AcademicCalendar;
 use App\Models\AcademicYear;
 use App\Models\Attendance;
 use App\Models\Grade;
@@ -531,7 +530,7 @@ class McpServer
             \App\Models\Grade::class => [
                 'academic_year_id' => ['class' => \App\Models\AcademicYear::class, 'array' => false],
             ],
-            \App\Models\AcademicCalendar::class => [
+            \App\Models\AcademicYear::class => [
                 'user_id' => ['class' => \App\Models\User::class, 'array' => false],
                 'academic_year_id' => ['class' => \App\Models\AcademicYear::class, 'array' => false],
             ],
