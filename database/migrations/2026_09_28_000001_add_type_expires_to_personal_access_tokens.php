@@ -9,8 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('personal_access_tokens', function (Blueprint $table) {
-            $table->string('type')->nullable()->after('abilities');
-            $table->timestamp('expires_at')->nullable()->after('type');
+            if (! Schema::hasColumn('personal_access_tokens', 'type')) {
+                $table->string('type')->nullable()->after('abilities');
+            }
+            if (! Schema::hasColumn('personal_access_tokens', 'expires_at')) {
+                $table->timestamp('expires_at')->nullable()->after('type');
+            }
         });
     }
 
