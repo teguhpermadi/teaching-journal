@@ -26,7 +26,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Jeffgreco13\FilamentBreezy\BreezyCore;
-use JeffGreco13\Breezy\Livewire\SanctumTokens;
+use Jeffgreco13\FilamentBreezy\Livewire\SanctumTokens;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Livewire\Livewire;
 
@@ -34,7 +34,10 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        Livewire::component('mcp_tokens', \App\Filament\Resources\Users\Pages\McpTokenManager::class);
+        Livewire::component(
+            'mcp_token_manager',
+            \App\Filament\Resources\Users\Pages\McpTokenManager::class,
+        );
 
         return $panel
             ->default()
@@ -42,6 +45,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->registration()
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -74,7 +78,7 @@ class AdminPanelProvider extends PanelProvider
                 BreezyCore::make()
                     ->myProfileComponents([
                         'personal_info' => MyPersonalInfo::class,
-                        'sanctum_tokens' => \JeffGreco13\Breezy\Livewire\SanctumTokens::class,
+                        'sanctum_tokens' => \Jeffgreco13\FilamentBreezy\Livewire\SanctumTokens::class,
                         'mcp_tokens' => \App\Filament\Resources\Users\Pages\McpTokenManager::class,
                     ])
                     ->myProfile(
